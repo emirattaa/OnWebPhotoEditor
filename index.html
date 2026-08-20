@@ -1,518 +1,831 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mobil Uyumlu Çizimli Fotoğraf Editörü</title>
-    <style>
-        :root {
-            --bg-color: #121212;
-            --panel-bg: #1e1e1e;
-            --text-color: #ffffff;
-            --accent-color: #007bff;
-            --accent-hover: #0056b3;
-            --border-color: #333333;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Katman Editörü</title>
+<style>
+  :root{
+    --bg: #14161a;
+    --panel: #1d2025;
+    --panel-2: #24282f;
+    --line: #33383f;
+    --text: #e9ebee;
+    --text-dim: #9aa1ab;
+    --accent: #ffb02e;
+    --accent-dim: #7a5a1a;
+    --danger: #ff5c5c;
+    --ok: #4cd88a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg); color:var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior:none;
+    user-select:none;
+  }
+  #app{
+    display:flex; flex-direction:column; height:100vh; height:100dvh;
+    max-width:560px; margin:0 auto;
+    background:var(--bg);
+    position:relative;
+    overflow:hidden;
+  }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+  /* ---- Top bar ---- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px; background:var(--panel);
+    border-bottom:1px solid var(--line);
+    flex-shrink:0; z-index:20;
+  }
+  header .title{
+    font-weight:700; font-size:15px; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:6px;
+  }
+  header .title .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  header .actions{display:flex; gap:8px;}
+  .icon-btn{
+    background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    width:36px; height:36px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:16px; cursor:pointer;
+  }
+  .icon-btn:active{ background:var(--accent-dim); }
+  .icon-btn.primary{ background:var(--accent); color:#20160a; border-color:var(--accent); font-weight:700; width:auto; padding:0 12px; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            overflow: hidden;
-        }
+  /* ---- Canvas stage ---- */
+  #stageWrap{
+    flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    background:
+      linear-gradient(45deg, #1a1c20 25%, transparent 25%) -0px -0px/20px 20px,
+      linear-gradient(-45deg, #1a1c20 25%, transparent 25%) -0px -0px/20px 20px,
+      linear-gradient(45deg, transparent 75%, #1a1c20 75%) -0px -0px/20px 20px,
+      linear-gradient(-45deg, transparent 75%, #1a1c20 75%) -0px -0px/20px 20px,
+      #101114;
+    background-size:20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    position:relative;
+    overflow:hidden;
+    touch-action:none;
+    padding:10px;
+  }
+  #stage{
+    max-width:100%; max-height:100%;
+    box-shadow:0 6px 30px rgba(0,0,0,0.5);
+    border-radius:4px;
+    touch-action:none;
+    background:transparent;
+  }
+  #emptyHint{
+    position:absolute; text-align:center; color:var(--text-dim); font-size:13px;
+    padding:20px; pointer-events:none; max-width:240px; line-height:1.5;
+  }
+  #emptyHint b{color:var(--text);}
 
-        header {
-            background-color: var(--panel-bg);
-            padding: 15px;
-            text-align: center;
-            font-size: 1.2rem;
-            font-weight: bold;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+  /* text input overlay */
+  #textInputOverlay{
+    position:absolute; z-index:30; display:none;
+  }
+  #textInputOverlay textarea{
+    background:rgba(20,22,26,0.9); border:2px dashed var(--accent);
+    color:var(--text); border-radius:6px; padding:6px 8px;
+    resize:none; outline:none; min-width:100px; max-width:220px;
+    font-family:inherit;
+  }
 
-        .header-btn {
-            background: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-        }
+  /* ---- Sub toolbar (contextual) ---- */
+  #subToolbar{
+    display:none;
+    gap:10px; align-items:center;
+    padding:10px 12px; background:var(--panel);
+    border-top:1px solid var(--line);
+    flex-shrink:0; overflow-x:auto; white-space:nowrap;
+  }
+  #subToolbar.show{ display:flex; }
+  #subToolbar .field{ display:flex; flex-direction:column; gap:3px; flex-shrink:0; }
+  #subToolbar label{ font-size:10px; color:var(--text-dim); }
+  #subToolbar input[type="range"]{ width:90px; accent-color:var(--accent); }
+  #subToolbar input[type="color"]{
+    width:34px; height:28px; border:1px solid var(--line); border-radius:6px; background:none; padding:0;
+  }
+  .swatch-row{ display:flex; gap:5px; }
+  .swatch{
+    width:22px; height:22px; border-radius:50%; border:2px solid #0000;
+    cursor:pointer; flex-shrink:0;
+  }
+  .swatch.active{ border-color:var(--text); }
+  .reset-btn{
+    flex-shrink:0; background:var(--panel-2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:0 10px; font-size:11px; height:28px; align-self:flex-end;
+  }
 
-        .main-container {
-            display: flex;
-            flex: 1;
-            flex-direction: row;
-            overflow: hidden;
-        }
+  /* ---- Main toolbar ---- */
+  #toolbar{
+    display:flex; padding:8px; gap:6px; background:var(--panel);
+    border-top:1px solid var(--line); flex-shrink:0;
+    justify-content:space-between;
+  }
+  .tool-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; color:var(--text-dim);
+    padding:7px 2px; border-radius:10px; font-size:10px;
+    cursor:pointer;
+  }
+  .tool-btn .ic{ font-size:19px; }
+  .tool-btn.active{ background:var(--panel-2); color:var(--accent); }
 
-        /* Sekme (Tab) Butonları */
-        .tabs {
-            display: flex;
-            background: var(--panel-bg);
-            border-bottom: 1px solid var(--border-color);
-        }
+  /* ---- Layers panel (bottom sheet) ---- */
+  #layersOverlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:40;
+    display:none;
+  }
+  #layersOverlay.show{ display:block; }
+  #layersSheet{
+    position:absolute; left:50%; bottom:0; transform:translateX(-50%);
+    width:100%; max-width:560px; max-height:70vh;
+    background:var(--panel); border-radius:16px 16px 0 0;
+    border:1px solid var(--line); border-bottom:none;
+    display:flex; flex-direction:column;
+    animation:slideUp .2s ease-out;
+  }
+  @keyframes slideUp{ from{transform:translateX(-50%) translateY(20px); opacity:0;} to{transform:translateX(-50%) translateY(0); opacity:1;} }
+  #layersSheet .sheet-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:12px 14px; border-bottom:1px solid var(--line);
+  }
+  #layersSheet .sheet-head h3{ margin:0; font-size:14px; }
+  #layersList{ overflow-y:auto; padding:8px; }
+  .layer-row{
+    display:flex; align-items:center; gap:10px;
+    padding:8px; border-radius:10px; margin-bottom:6px;
+    background:var(--panel-2); border:1px solid var(--line);
+  }
+  .layer-row.selected{ border-color:var(--accent); background:#2a2410; }
+  .layer-thumb{
+    width:44px; height:44px; border-radius:6px; border:1px solid var(--line);
+    background-image:
+      linear-gradient(45deg, #333 25%, transparent 25%),
+      linear-gradient(-45deg, #333 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #333 75%),
+      linear-gradient(-45deg, transparent 75%, #333 75%);
+    background-size:8px 8px; background-position:0 0, 0 4px, 4px -4px, -4px 0px;
+    background-color:#222;
+    flex-shrink:0; object-fit:contain;
+    cursor:pointer;
+  }
+  .layer-info{ flex:1; min-width:0; }
+  .layer-info .name{ font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  .layer-info input[type="range"]{ width:100%; accent-color:var(--accent); height:14px; }
+  .layer-btns{ display:flex; gap:4px; flex-shrink:0; }
+  .layer-btns button{
+    width:28px; height:28px; border-radius:7px; border:1px solid var(--line);
+    background:var(--panel); color:var(--text); font-size:13px; cursor:pointer;
+  }
+  .layer-btns button.danger{ color:var(--danger); }
+  .layer-btns button:disabled{ opacity:0.3; }
+  #addLayerBtns{ display:flex; gap:8px; padding:10px 14px 14px; border-top:1px solid var(--line); }
+  #addLayerBtns button{
+    flex:1; padding:10px; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel-2); color:var(--text); font-size:12.5px; font-weight:600;
+  }
 
-        .tab-btn {
-            flex: 1;
-            padding: 12px;
-            background: none;
-            border: none;
-            color: #aaa;
-            cursor: pointer;
-            font-size: 1rem;
-            border-bottom: 3px solid transparent;
-        }
+  input[type="file"]{ display:none; }
 
-        .tab-btn.active {
-            color: var(--accent-color);
-            border-bottom: 3px solid var(--accent-color);
-        }
-
-        .sidebar {
-            width: 300px;
-            background-color: var(--panel-bg);
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--border-color);
-            overflow-y: auto;
-        }
-
-        .panel {
-            display: none;
-            padding: 20px;
-            flex-direction: column;
-            gap: 15px;
-        }
-
-        .panel.active {
-            display: flex;
-        }
-
-        .editor-workspace {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 15px;
-            background-color: #0a0a0a;
-            position: relative;
-            overflow: hidden;
-        }
-
-        canvas {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            border-radius: 4px;
-            touch-action: none; /* Mobilde çizerken ekranın kaymasını engeller */
-            cursor: crosshair;
-        }
-
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .control-group label {
-            font-size: 0.9rem;
-            display: flex;
-            justify-content: space-between;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            accent-color: var(--accent-color);
-        }
-
-        input[type="text"], input[type="color"] {
-            width: 100%;
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #444;
-            background: #222;
-            color: white;
-            outline: none;
-        }
-        
-        input[type="color"] {
-            padding: 2px;
-            height: 40px;
-            cursor: pointer;
-        }
-
-        .btn {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 1rem;
-            text-align: center;
-            width: 100%;
-        }
-
-        .btn-secondary {
-            background-color: #444;
-        }
-
-        .file-label {
-            display: block;
-            background-color: #28a745;
-            color: white;
-            padding: 12px;
-            text-align: center;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 20px;
-        }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        .placeholder-text {
-            color: #555;
-            font-size: 1.2rem;
-            position: absolute;
-            pointer-events: none;
-        }
-
-        .action-row {
-            display: flex;
-            gap: 10px;
-            padding: 0 20px 20px 20px;
-        }
-
-        /* Mobil Uyum */
-        @media (max-width: 768px) {
-            .main-container {
-                flex-direction: column-reverse; /* Mobilde araçlar altta olsun */
-            }
-            .sidebar {
-                width: 100%;
-                border-right: none;
-                border-top: 1px solid var(--border-color);
-                max-height: 45vh; /* Ekranın alt yarısı araçlar */
-            }
-            .editor-workspace {
-                height: 55vh; /* Üst yarısı fotoğraf */
-            }
-            .file-label {
-                margin: 10px;
-            }
-        }
-    </style>
+  ::-webkit-scrollbar{ width:6px; height:6px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+</style>
 </head>
 <body>
+<div id="app">
 
-    <header>
-        <span>🎨 Mobil Editör</span>
-        <button class="header-btn" id="downloadBtn">İndir</button>
-    </header>
-
-    <div class="main-container">
-        <div class="sidebar">
-            <label class="file-label">
-                📸 Fotoğraf Yükle
-                <input type="file" id="uploadInput" accept="image/*">
-            </label>
-
-            <!-- Sekmeler -->
-            <div class="tabs">
-                <button class="tab-btn active" data-target="panel-filter" onclick="setMode('filter')">Filtre</button>
-                <button class="tab-btn" data-target="panel-draw" onclick="setMode('draw')">Çizim</button>
-                <button class="tab-btn" data-target="panel-text" onclick="setMode('text')">Yazı</button>
-            </div>
-
-            <!-- Filtre Paneli -->
-            <div id="panel-filter" class="panel active">
-                <div class="control-group">
-                    <label><span>Parlaklık</span> <span id="brightness-val">100%</span></label>
-                    <input type="range" id="brightness" min="0" max="200" value="100" class="filter-slider">
-                </div>
-                <div class="control-group">
-                    <label><span>Kontrast</span> <span id="contrast-val">100%</span></label>
-                    <input type="range" id="contrast" min="0" max="200" value="100" class="filter-slider">
-                </div>
-                <div class="control-group">
-                    <label><span>Doygunluk</span> <span id="saturate-val">100%</span></label>
-                    <input type="range" id="saturate" min="0" max="200" value="100" class="filter-slider">
-                </div>
-            </div>
-
-            <!-- Çizim Paneli -->
-            <div id="panel-draw" class="panel">
-                <div class="control-group">
-                    <label>Fırça Rengi</label>
-                    <input type="color" id="brushColor" value="#ff0000">
-                </div>
-                <div class="control-group">
-                    <label><span>Fırça Boyutu</span> <span id="brushSize-val">5px</span></label>
-                    <input type="range" id="brushSize" min="1" max="50" value="5">
-                </div>
-                <small style="color:#aaa;">* Ekrana dokunarak çizin</small>
-            </div>
-
-            <!-- Yazı Paneli -->
-            <div id="panel-text" class="panel">
-                <div class="control-group">
-                    <label>Yazılacak Metin</label>
-                    <input type="text" id="textInput" placeholder="Buraya yazın...">
-                </div>
-                <div class="control-group">
-                    <label>Yazı Rengi</label>
-                    <input type="color" id="textColor" value="#ffffff">
-                </div>
-                <div class="control-group">
-                    <label><span>Yazı Boyutu</span> <span id="textSize-val">30px</span></label>
-                    <input type="range" id="textSize" min="10" max="150" value="30">
-                </div>
-                <small style="color:#aaa;">* Metni yerleştirmek için fotoğrafa dokunun</small>
-            </div>
-
-            <div class="action-row">
-                <button class="btn btn-secondary" id="undoBtn">↩️ Geri Al</button>
-            </div>
-        </div>
-
-        <div class="editor-workspace">
-            <div class="placeholder-text" id="placeholder">Fotoğraf Yükleyin</div>
-            <canvas id="canvas"></canvas>
-        </div>
+  <header>
+    <div class="title"><span class="dot"></span> Katman Editörü</div>
+    <div class="actions">
+      <button class="icon-btn" id="undoBtn" title="Geri al">↶</button>
+      <button class="icon-btn" id="newBtn" title="Yeni proje">🗑</button>
+      <button class="icon-btn primary" id="exportBtn">Dışa Aktar</button>
     </div>
+  </header>
 
-    <script>
-        // DOM Elementleri
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const placeholder = document.getElementById('placeholder');
-        
-        let baseImg = new Image();
-        let imageLoaded = false;
-        let currentMode = 'filter'; // filter, draw, text
-        
-        // Katmanlar (Çizim ve yazıları tutar)
-        let layers = []; 
-        let isDrawing = false;
-        let currentPath = null;
+  <div id="stageWrap">
+    <canvas id="stage" width="1000" height="1400"></canvas>
+    <div id="emptyHint">Başlamak için altta <b>Görsel Ekle</b>'ye dokun, birden fazla fotoğraf seçebilirsin. Her görsel ayrı bir katman olur.</div>
+    <div id="textInputOverlay"><textarea id="textInputBox" rows="1" placeholder="Yazı..."></textarea></div>
+  </div>
 
-        // Sekme Değiştirme Mantığı
-        const tabBtns = document.querySelectorAll('.tab-btn');
-        const panels = document.querySelectorAll('.panel');
+  <div id="subToolbar"></div>
 
-        function setMode(mode) {
-            currentMode = mode;
-            // Arayüzü güncelle
-            tabBtns.forEach(btn => {
-                if(btn.dataset.target === `panel-${mode}`) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
-            panels.forEach(panel => {
-                if(panel.id === `panel-${mode}`) panel.classList.add('active');
-                else panel.classList.remove('active');
-            });
-        }
+  <div id="toolbar">
+    <button class="tool-btn active" data-tool="move"><span class="ic">✛</span>Taşı</button>
+    <button class="tool-btn" data-tool="transform"><span class="ic">⤢</span>Boyut/Döndür</button>
+    <button class="tool-btn" data-tool="brush"><span class="ic">🖌</span>Fırça</button>
+    <button class="tool-btn" data-tool="eraser"><span class="ic">🧽</span>Silgi</button>
+    <button class="tool-btn" data-tool="text"><span class="ic">🅣</span>Yazı</button>
+    <button class="tool-btn" id="addImageBtn"><span class="ic">🖼</span>Görsel Ekle</button>
+    <button class="tool-btn" id="layersBtn"><span class="ic">📚</span>Katmanlar</button>
+  </div>
 
-        // --- FOTOĞRAF YÜKLEME ---
-        document.getElementById('uploadInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                baseImg.onload = function() {
-                    canvas.width = baseImg.width;
-                    canvas.height = baseImg.height;
-                    placeholder.style.display = 'none';
-                    imageLoaded = true;
-                    layers = []; // Yeni fotoğrafta eski çizimleri sil
-                    renderCanvas();
-                };
-                baseImg.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-        });
+  <input type="file" id="fileInput" accept="image/*" multiple>
 
-        // --- FİLTRELER ---
-        const filterSliders = document.querySelectorAll('.filter-slider');
-        filterSliders.forEach(slider => {
-            slider.addEventListener('input', (e) => {
-                document.getElementById(`${e.target.id}-val`).innerText = `${e.target.value}%`;
-                if(imageLoaded) renderCanvas();
-            });
-        });
+  <div id="layersOverlay">
+    <div id="layersSheet">
+      <div class="sheet-head">
+        <h3>Katmanlar</h3>
+        <button class="icon-btn" id="closeLayersBtn">✕</button>
+      </div>
+      <div id="layersList"></div>
+      <div id="addLayerBtns">
+        <button id="addBlankLayerBtn">+ Boş Katman</button>
+        <button id="addImageBtn2">+ Görsel Katman</button>
+      </div>
+    </div>
+  </div>
 
-        // --- DOKUNMATİK VE FARE OLAYLARI KONTROLÜ ---
-        function getPos(evt) {
-            const rect = canvas.getBoundingClientRect();
-            // Mobil dokunma mı yoksa fare mi kontrolü
-            let clientX = evt.clientX;
-            let clientY = evt.clientY;
-            
-            if (evt.touches && evt.touches.length > 0) {
-                clientX = evt.touches[0].clientX;
-                clientY = evt.touches[0].clientY;
-            }
+</div>
 
-            // Canvas'ın ekrandaki boyutu ile gerçek çözünürlüğü arasındaki oranı hesapla
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
+<script>
+(function(){
+  "use strict";
 
-            return {
-                x: (clientX - rect.left) * scaleX,
-                y: (clientY - rect.top) * scaleY
-            };
-        }
+  const STAGE_W = 1000, STAGE_H = 1400;
+  const stage = document.getElementById('stage');
+  const sctx = stage.getContext('2d');
+  const stageWrap = document.getElementById('stageWrap');
+  const emptyHint = document.getElementById('emptyHint');
 
-        // Çizim ve Yazı Ekleme Başlangıcı
-        function startAction(e) {
-            if (!imageLoaded || currentMode === 'filter') return;
-            e.preventDefault(); // Mobilde kaymayı önle
+  // layer: {id, name, canvas, ctx, visible, opacity, type, tx, ty, scale, rotation}
+  //   tx/ty: pixel translation baked directly into canvas content by the "move" tool
+  //   scale/rotation: non-destructive transform applied at render time around the
+  //                    stage center, used by the "transform" (resize/rotate) tool
+  let layers = [];
+  let selectedId = null;
+  let currentTool = 'move';
+  let layerCounter = 0;
 
-            const pos = getPos(e);
+  let brushColor = '#ff3b3b';
+  let brushSize = 18;
+  let eraserSize = 30;
+  let textColor = '#ffffff';
+  let textSize = 56;
 
-            if (currentMode === 'draw') {
-                isDrawing = true;
-                currentPath = {
-                    type: 'stroke',
-                    color: document.getElementById('brushColor').value,
-                    size: document.getElementById('brushSize').value,
-                    points: [pos]
-                };
-                layers.push(currentPath);
-            } 
-            else if (currentMode === 'text') {
-                const textVal = document.getElementById('textInput').value;
-                if(textVal.trim() === "") {
-                    alert("Lütfen önce sol taraftan eklenecek metni yazın.");
-                    return;
-                }
-                layers.push({
-                    type: 'text',
-                    text: textVal,
-                    x: pos.x,
-                    y: pos.y,
-                    color: document.getElementById('textColor').value,
-                    size: document.getElementById('textSize').value
-                });
-                renderCanvas();
-            }
-        }
+  const undoStack = []; // {layerId, type:'canvas', data} or {layerId, type:'transform', scale, rotation}
+  const MAX_UNDO = 15;
 
-        // Çizim Hareketi
-        function moveAction(e) {
-            if (!isDrawing || currentMode !== 'draw') return;
-            e.preventDefault();
-            const pos = getPos(e);
-            currentPath.points.push(pos);
-            renderCanvas();
-        }
+  // ---------- helpers ----------
+  function uid(){ return 'l' + (++layerCounter) + '_' + Math.random().toString(36).slice(2,7); }
 
-        // Çizim Bitişi
-        function endAction(e) {
-            if (!isDrawing) return;
-            e.preventDefault();
-            isDrawing = false;
-        }
+  function makeLayerCanvas(){
+    const c = document.createElement('canvas');
+    c.width = STAGE_W; c.height = STAGE_H;
+    return c;
+  }
 
-        // Event Listener'ları Ekle (Hem Fare Hem Dokunmatik için)
-        canvas.addEventListener('mousedown', startAction);
-        canvas.addEventListener('mousemove', moveAction);
-        canvas.addEventListener('mouseup', endAction);
-        canvas.addEventListener('mouseleave', endAction);
+  function addLayer(canvas, name, type){
+    const layer = {
+      id: uid(), name: name || ('Katman ' + (layers.length+1)),
+      canvas, ctx: canvas.getContext('2d'),
+      visible:true, opacity:1, type: type||'paint',
+      scale:1, rotation:0, tx:0, ty:0
+    };
+    layers.push(layer);
+    selectedId = layer.id;
+    refreshAll();
+    return layer;
+  }
 
-        canvas.addEventListener('touchstart', startAction, { passive: false });
-        canvas.addEventListener('touchmove', moveAction, { passive: false });
-        canvas.addEventListener('touchend', endAction);
+  function getSelected(){ return layers.find(l => l.id === selectedId) || null; }
 
-        // Arayüz Değer Güncellemeleri (Fırça ve Yazı Boyutu Metinleri)
-        document.getElementById('brushSize').addEventListener('input', e => {
-            document.getElementById('brushSize-val').innerText = `${e.target.value}px`;
-        });
-        document.getElementById('textSize').addEventListener('input', e => {
-            document.getElementById('textSize-val').innerText = `${e.target.value}px`;
-        });
+  function selectLayer(id){
+    selectedId = id;
+    refreshAll();
+  }
 
-        // Geri Al Butonu
-        document.getElementById('undoBtn').addEventListener('click', () => {
-            if(layers.length > 0) {
-                layers.pop();
-                renderCanvas();
-            }
-        });
+  function render(){
+    sctx.clearRect(0,0,STAGE_W,STAGE_H);
+    for(const l of layers){
+      if(!l.visible) continue;
+      sctx.save();
+      sctx.globalAlpha = l.opacity;
+      // Non-destructive position/scale/rotation, anchored at the stage center.
+      // Because this never redraws the layer's own pixel data into a clipped
+      // canvas, dragging a layer partway off-stage and back never loses any
+      // of its content — only what's visible on the stage is cropped, not
+      // the layer itself.
+      sctx.translate(STAGE_W/2 + (l.tx||0), STAGE_H/2 + (l.ty||0));
+      sctx.rotate((l.rotation||0) * Math.PI/180);
+      sctx.scale(l.scale||1, l.scale||1);
+      sctx.drawImage(l.canvas, -STAGE_W/2, -STAGE_H/2);
+      sctx.restore();
+    }
+    sctx.globalAlpha = 1;
+    emptyHint.style.display = layers.length === 0 ? 'block' : 'none';
+  }
 
-        // --- RENDER MOTORU (Tüm işlemler burada ekrana basılır) ---
-        function renderCanvas() {
-            if (!imageLoaded) return;
+  function refreshAll(){
+    render();
+    updateLayersList();
+    renderSubToolbar();
+  }
 
-            // 1. Tuvali Temizle
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+  function pushUndo(layer){
+    if(!layer) return;
+    undoStack.push({ layerId: layer.id, type:'canvas', data: layer.canvas.toDataURL() });
+    if(undoStack.length > MAX_UNDO) undoStack.shift();
+  }
 
-            // 2. Filtreleri ayarla ve Orijinal Fotoğrafı Çiz
-            const brightness = document.getElementById('brightness').value;
-            const contrast = document.getElementById('contrast').value;
-            const saturate = document.getElementById('saturate').value;
-            
-            ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturate}%)`;
-            ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+  function pushUndoTransform(layer){
+    if(!layer) return;
+    undoStack.push({ layerId: layer.id, type:'transform', scale: layer.scale, rotation: layer.rotation, tx: layer.tx||0, ty: layer.ty||0 });
+    if(undoStack.length > MAX_UNDO) undoStack.shift();
+  }
 
-            // 3. Filtreleri kapat (Çizimler ve yazılar filtreden etkilenmesin diye)
-            ctx.filter = 'none';
+  function undo(){
+    const last = undoStack.pop();
+    if(!last) return;
+    const layer = layers.find(l => l.id === last.layerId);
+    if(!layer) return;
+    if(last.type === 'transform'){
+      layer.scale = last.scale;
+      layer.rotation = last.rotation;
+      layer.tx = last.tx||0;
+      layer.ty = last.ty||0;
+      refreshAll();
+      return;
+    }
+    const img = new Image();
+    img.onload = function(){
+      layer.ctx.clearRect(0,0,STAGE_W,STAGE_H);
+      layer.ctx.drawImage(img,0,0);
+      render();
+    };
+    img.src = last.data;
+  }
+  document.getElementById('undoBtn').addEventListener('click', undo);
 
-            // 4. Katmanları (Çizim ve Yazıları) üstüne ekle
-            layers.forEach(layer => {
-                if (layer.type === 'stroke') {
-                    ctx.beginPath();
-                    ctx.strokeStyle = layer.color;
-                    ctx.lineWidth = layer.size;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    
-                    for (let i = 0; i < layer.points.length; i++) {
-                        const pt = layer.points[i];
-                        if (i === 0) ctx.moveTo(pt.x, pt.y);
-                        else ctx.lineTo(pt.x, pt.y);
-                    }
-                    ctx.stroke();
-                } 
-                else if (layer.type === 'text') {
-                    ctx.font = `bold ${layer.size}px Arial`;
-                    ctx.fillStyle = layer.color;
-                    ctx.textBaseline = 'middle';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(layer.text, layer.x, layer.y);
-                }
-            });
-        }
+  // ---------- new project ----------
+  document.getElementById('newBtn').addEventListener('click', function(){
+    if(layers.length === 0) return;
+    if(!confirm('Tüm katmanlar silinsin mi? Bu işlem geri alınamaz.')) return;
+    layers = [];
+    selectedId = null;
+    undoStack.length = 0;
+    refreshAll();
+  });
 
-        // --- İNDİRME İŞLEMİ ---
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            if (!imageLoaded) {
-                alert('Lütfen önce bir fotoğraf yükleyin!');
-                return;
-            }
-            const link = document.createElement('a');
-            link.download = 'mobil_duzenleme.png';
-            link.href = canvas.toDataURL('image/png', 1.0);
-            link.click();
-        });
-    </script>
+  // ---------- export ----------
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    render();
+    stage.toBlob(function(blob){
+      if(!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'katman-editoru.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, 'image/png');
+  });
+
+  // ---------- image loading ----------
+  function loadImagesAsLayers(fileList){
+    const files = Array.from(fileList || []);
+    files.forEach(file => {
+      if(!file.type.startsWith('image/')) return;
+      const reader = new FileReader();
+      reader.onload = function(e){
+        const img = new Image();
+        img.onload = function(){
+          const canvas = makeLayerCanvas();
+          const ctx = canvas.getContext('2d');
+          // contain-fit, centered
+          const scale = Math.min(STAGE_W / img.width, STAGE_H / img.height);
+          const w = img.width * scale, h = img.height * scale;
+          const x = (STAGE_W - w) / 2, y = (STAGE_H - h) / 2;
+          ctx.drawImage(img, x, y, w, h);
+          const name = file.name ? file.name.replace(/\.[^.]+$/, '').slice(0,18) : 'Görsel';
+          addLayer(canvas, name, 'image');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  document.getElementById('fileInput').addEventListener('change', function(e){
+    loadImagesAsLayers(e.target.files);
+    e.target.value = '';
+  });
+  document.getElementById('addImageBtn').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('addImageBtn2').addEventListener('click', () => document.getElementById('fileInput').click());
+  document.getElementById('addBlankLayerBtn').addEventListener('click', () => {
+    addLayer(makeLayerCanvas(), 'Boş Katman', 'blank');
+  });
+
+  // ---------- tools ----------
+  const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+  toolBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTool = btn.dataset.tool;
+      toolBtns.forEach(b => b.classList.toggle('active', b === btn));
+      renderSubToolbar();
+    });
+  });
+
+  function renderSubToolbar(){
+    const bar = document.getElementById('subToolbar');
+    bar.innerHTML = '';
+    bar.classList.remove('show');
+    const sel = getSelected();
+
+    if(currentTool === 'brush'){
+      bar.classList.add('show');
+      bar.innerHTML = `
+        <div class="field"><label>Renk</label><input type="color" id="brushColorInp" value="${brushColor}"></div>
+        <div class="swatch-row" id="brushSwatches"></div>
+        <div class="field"><label>Kalınlık: <span id="brushSizeVal">${brushSize}</span></label>
+          <input type="range" min="2" max="120" value="${brushSize}" id="brushSizeInp"></div>
+      `;
+      document.getElementById('brushColorInp').addEventListener('input', e => { brushColor = e.target.value; buildSwatches(); });
+      document.getElementById('brushSizeInp').addEventListener('input', e => { brushSize = +e.target.value; document.getElementById('brushSizeVal').textContent = brushSize; });
+      buildSwatches();
+    }
+    else if(currentTool === 'eraser'){
+      bar.classList.add('show');
+      bar.innerHTML = `
+        <div class="field"><label>Silgi boyutu: <span id="eraserSizeVal">${eraserSize}</span></label>
+          <input type="range" min="4" max="160" value="${eraserSize}" id="eraserSizeInp"></div>
+        <div class="field" style="font-size:10px;color:var(--text-dim);max-width:150px;white-space:normal;">Seçili katmandaki içeriği saydam yapar.</div>
+      `;
+      document.getElementById('eraserSizeInp').addEventListener('input', e => { eraserSize = +e.target.value; document.getElementById('eraserSizeVal').textContent = eraserSize; });
+    }
+    else if(currentTool === 'text'){
+      bar.classList.add('show');
+      bar.innerHTML = `
+        <div class="field"><label>Renk</label><input type="color" id="textColorInp" value="${textColor}"></div>
+        <div class="field"><label>Boyut: <span id="textSizeVal">${textSize}</span></label>
+          <input type="range" min="16" max="160" value="${textSize}" id="textSizeInp"></div>
+        <div class="field" style="font-size:10px;color:var(--text-dim);max-width:150px;white-space:normal;">Sahneye dokun, yazını yaz, dışına dokunarak onayla.</div>
+      `;
+      document.getElementById('textColorInp').addEventListener('input', e => textColor = e.target.value);
+      document.getElementById('textSizeInp').addEventListener('input', e => { textSize = +e.target.value; document.getElementById('textSizeVal').textContent = textSize; });
+    }
+    else if(currentTool === 'move'){
+      bar.classList.add('show');
+      bar.innerHTML = `<div class="field" style="font-size:11px;color:var(--text-dim);white-space:normal;max-width:280px;">Seçili katmanı sürükleyerek konumunu değiştir.</div>`;
+    }
+    else if(currentTool === 'transform'){
+      bar.classList.add('show');
+      if(!sel){
+        bar.innerHTML = `<div class="field" style="font-size:11px;color:var(--text-dim);white-space:normal;">Önce Katmanlar panelinden bir katman seç.</div>`;
+        return;
+      }
+      const scalePct = Math.round((sel.scale||1) * 100);
+      const rotDeg = Math.round(sel.rotation||0);
+      bar.innerHTML = `
+        <div class="field"><label>Boyut: <span id="scaleVal">${scalePct}%</span></label>
+          <input type="range" min="10" max="300" value="${scalePct}" id="scaleInp"></div>
+        <div class="field"><label>Döndür: <span id="rotVal">${rotDeg}°</span></label>
+          <input type="range" min="-180" max="180" value="${rotDeg}" id="rotInp"></div>
+        <button class="reset-btn" id="transformResetBtn">Sıfırla</button>
+      `;
+      let transformUndoPushed = false;
+      function ensureUndoPushed(){
+        if(!transformUndoPushed){ pushUndoTransform(sel); transformUndoPushed = true; }
+      }
+      const scaleInp = document.getElementById('scaleInp');
+      const rotInp = document.getElementById('rotInp');
+      scaleInp.addEventListener('pointerdown', () => { transformUndoPushed = false; });
+      rotInp.addEventListener('pointerdown', () => { transformUndoPushed = false; });
+      scaleInp.addEventListener('input', e => {
+        ensureUndoPushed();
+        sel.scale = (+e.target.value) / 100;
+        document.getElementById('scaleVal').textContent = e.target.value + '%';
+        render();
+      });
+      rotInp.addEventListener('input', e => {
+        ensureUndoPushed();
+        sel.rotation = +e.target.value;
+        document.getElementById('rotVal').textContent = e.target.value + '°';
+        render();
+      });
+      document.getElementById('transformResetBtn').addEventListener('click', () => {
+        pushUndoTransform(sel);
+        sel.scale = 1;
+        sel.rotation = 0;
+        renderSubToolbar();
+        render();
+      });
+    }
+  }
+
+  function buildSwatches(){
+    const row = document.getElementById('brushSwatches');
+    if(!row) return;
+    const colors = ['#ff3b3b','#ffb02e','#ffe600','#4cd88a','#2ea3ff','#8a5cff','#ffffff','#000000'];
+    row.innerHTML = '';
+    colors.forEach(c => {
+      const s = document.createElement('div');
+      s.className = 'swatch' + (c.toLowerCase() === brushColor.toLowerCase() ? ' active' : '');
+      s.style.background = c;
+      s.addEventListener('click', () => { brushColor = c; document.getElementById('brushColorInp').value = c; buildSwatches(); });
+      row.appendChild(s);
+    });
+  }
+  renderSubToolbar();
+
+  // ---------- pointer interaction on stage ----------
+  function stagePoint(evt){
+    const rect = stage.getBoundingClientRect();
+    const x = (evt.clientX - rect.left) * (STAGE_W / rect.width);
+    const y = (evt.clientY - rect.top) * (STAGE_H / rect.height);
+    return {x, y};
+  }
+
+  // Converts a point in STAGE (screen) space into the layer's own untransformed
+  // pixel space, by applying the inverse of the scale/rotation that render()
+  // uses to draw that layer. This keeps drag distance, brush width, and text
+  // size matching what you see on screen, no matter how small/rotated the
+  // layer currently is — only the layer's visual SIZE should change, not the
+  // "speed" of edits made to it.
+  function toLocalPoint(layer, stagePt){
+    const cx = STAGE_W/2, cy = STAGE_H/2;
+    const vcx = cx + (layer.tx||0), vcy = cy + (layer.ty||0); // where the layer visually sits
+    const scale = layer.scale || 1;
+    const rot = -(layer.rotation||0) * Math.PI/180; // inverse rotation
+    let dx = (stagePt.x - vcx) / scale;
+    let dy = (stagePt.y - vcy) / scale;
+    const cos = Math.cos(rot), sin = Math.sin(rot);
+    const rx = dx*cos - dy*sin;
+    const ry = dx*sin + dy*cos;
+    return { x: rx + cx, y: ry + cy };
+  }
+
+  let drawing = false;
+  let lastPt = null;
+  let movingLayer = null, moveStart = null, moveStartTx = 0, moveStartTy = 0;
+
+  // transform-tool (resize/rotate by dragging on the stage) state
+  let transforming = null; // { layer, startScale, startRotation, startAngle, startDist }
+
+  stage.addEventListener('pointerdown', function(evt){
+    const layer = getSelected();
+    if(!layer){ return; }
+    stage.setPointerCapture(evt.pointerId);
+    const pStage = stagePoint(evt);
+
+    if(currentTool === 'brush' || currentTool === 'eraser'){
+      const p = toLocalPoint(layer, pStage);
+      pushUndo(layer);
+      drawing = true;
+      lastPt = p;
+      strokeAt(layer, p, p);
+    }
+    else if(currentTool === 'move'){
+      // Non-destructive: we just record where the drag started and adjust
+      // the layer's tx/ty offset at render time. Nothing about the layer's
+      // actual pixel content is ever touched, so moving it off-stage and
+      // back never crops or loses anything.
+      movingLayer = layer;
+      moveStart = pStage;
+      moveStartTx = layer.tx || 0;
+      moveStartTy = layer.ty || 0;
+      pushUndoTransform(layer);
+    }
+    else if(currentTool === 'transform'){
+      // Drag anywhere on the stage: distance from the layer's visual center
+      // controls scale, angle around that center controls rotation.
+      pushUndoTransform(layer);
+      const cx = STAGE_W/2 + (layer.tx||0), cy = STAGE_H/2 + (layer.ty||0);
+      const dx = pStage.x - cx, dy = pStage.y - cy;
+      transforming = {
+        layer,
+        startScale: layer.scale || 1,
+        startRotation: layer.rotation || 0,
+        startDist: Math.max(1, Math.hypot(dx,dy)),
+        startAngle: Math.atan2(dy,dx) * 180/Math.PI
+      };
+    }
+    else if(currentTool === 'text'){
+      openTextInput(pStage, layer);
+    }
+  });
+
+  stage.addEventListener('pointermove', function(evt){
+    if(drawing && (currentTool === 'brush' || currentTool === 'eraser')){
+      const layer = getSelected();
+      if(!layer) return;
+      const p = toLocalPoint(layer, stagePoint(evt));
+      strokeAt(layer, lastPt, p);
+      lastPt = p;
+    }
+    else if(movingLayer){
+      const p = stagePoint(evt);
+      const dx = p.x - moveStart.x, dy = p.y - moveStart.y;
+      movingLayer.tx = moveStartTx + dx;
+      movingLayer.ty = moveStartTy + dy;
+      render();
+    }
+    else if(transforming){
+      const p = stagePoint(evt);
+      const t = transforming;
+      const cx = STAGE_W/2 + (t.layer.tx||0), cy = STAGE_H/2 + (t.layer.ty||0);
+      const dx = p.x - cx, dy = p.y - cy;
+      const dist = Math.max(1, Math.hypot(dx,dy));
+      const angle = Math.atan2(dy,dx) * 180/Math.PI;
+
+      let newScale = t.startScale * (dist / t.startDist);
+      newScale = Math.min(3, Math.max(0.1, newScale));
+      let newRotation = t.startRotation + (angle - t.startAngle);
+      // normalize to -180..180
+      newRotation = ((newRotation + 180) % 360 + 360) % 360 - 180;
+
+      t.layer.scale = newScale;
+      t.layer.rotation = newRotation;
+      render();
+      if(currentTool === 'transform') renderSubToolbar();
+    }
+  });
+
+  function endStroke(){
+    drawing = false; lastPt = null;
+    movingLayer = null; moveStart = null;
+    transforming = null;
+  }
+  stage.addEventListener('pointerup', endStroke);
+  stage.addEventListener('pointercancel', endStroke);
+  stage.addEventListener('pointerleave', function(){ if(!movingLayer && !transforming) endStroke(); });
+
+  function strokeAt(layer, from, to){
+    const ctx = layer.ctx;
+    const scale = layer.scale || 1;
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if(currentTool === 'eraser'){
+      ctx.globalCompositeOperation = 'destination-out';
+      // Divide by the layer's current display scale so the eraser feels the
+      // same size on screen, whether the layer is shrunk or enlarged.
+      ctx.lineWidth = eraserSize / scale;
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.lineWidth = brushSize / scale;
+      ctx.strokeStyle = brushColor;
+    }
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    // dot for single taps
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, ctx.lineWidth/2, 0, Math.PI*2);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+    ctx.restore();
+    render();
+  }
+
+  // ---------- text tool ----------
+  const textOverlay = document.getElementById('textInputOverlay');
+  const textBox = document.getElementById('textInputBox');
+  let pendingTextPoint = null;   // in the target layer's local pixel space
+  let pendingTextLayer = null;
+
+  function openTextInput(stagePt, layer){
+    pendingTextLayer = layer;
+    // Keep the on-screen typing position exactly where the finger tapped...
+    pendingTextPoint = toLocalPoint(layer, stagePt);
+    const rect = stage.getBoundingClientRect();
+    const screenX = rect.left + stagePt.x * (rect.width / STAGE_W);
+    const screenY = rect.top + stagePt.y * (rect.height / STAGE_H);
+    const wrapRect = stageWrap.getBoundingClientRect();
+    textOverlay.style.left = (screenX - wrapRect.left) + 'px';
+    textOverlay.style.top = (screenY - wrapRect.top) + 'px';
+    textOverlay.style.display = 'block';
+    // ...while typing, show it at the size it will actually appear on screen.
+    textBox.style.fontSize = Math.max(12, textSize * (rect.width / STAGE_W)) + 'px';
+    textBox.style.color = textColor;
+    textBox.value = '';
+    setTimeout(() => textBox.focus(), 0);
+  }
+
+  function commitTextInput(){
+    if(textOverlay.style.display === 'none') return;
+    const value = textBox.value;
+    textOverlay.style.display = 'none';
+    if(!value || !value.trim() || !pendingTextPoint || !pendingTextLayer){ pendingTextPoint = null; pendingTextLayer = null; return; }
+    const layer = pendingTextLayer;
+    pushUndo(layer);
+    const ctx = layer.ctx;
+    const scale = layer.scale || 1;
+    // Divide by scale so the text ends up the size you saw on screen when you
+    // typed it, regardless of the layer's current zoom level.
+    const localTextSize = textSize / scale;
+    ctx.save();
+    ctx.fillStyle = textColor;
+    ctx.font = `${localTextSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+    ctx.textBaseline = 'top';
+    const lines = value.split('\n');
+    lines.forEach((line, i) => {
+      ctx.fillText(line, pendingTextPoint.x, pendingTextPoint.y + i * localTextSize * 1.2);
+    });
+    ctx.restore();
+    render();
+    pendingTextPoint = null;
+    pendingTextLayer = null;
+  }
+
+  textBox.addEventListener('blur', commitTextInput);
+  stageWrap.addEventListener('pointerdown', function(evt){
+    if(textOverlay.style.display === 'block' && evt.target !== textBox){
+      commitTextInput();
+    }
+  }, true);
+
+  // ---------- layers list (bottom sheet) ----------
+  const layersOverlay = document.getElementById('layersOverlay');
+  const layersList = document.getElementById('layersList');
+
+  document.getElementById('layersBtn').addEventListener('click', () => {
+    updateLayersList();
+    layersOverlay.classList.add('show');
+  });
+  document.getElementById('closeLayersBtn').addEventListener('click', () => layersOverlay.classList.remove('show'));
+  layersOverlay.addEventListener('click', (e) => { if(e.target === layersOverlay) layersOverlay.classList.remove('show'); });
+
+  function updateLayersList(){
+    layersList.innerHTML = '';
+    // Show topmost layer first in the list.
+    for(let i = layers.length - 1; i >= 0; i--){
+      const l = layers[i];
+      const row = document.createElement('div');
+      row.className = 'layer-row' + (l.id === selectedId ? ' selected' : '');
+
+      const thumb = document.createElement('canvas');
+      thumb.className = 'layer-thumb';
+      thumb.width = 44; thumb.height = 44;
+      const tctx = thumb.getContext('2d');
+      const s = Math.min(44 / STAGE_W, 44 / STAGE_H);
+      const tw = STAGE_W * s, th = STAGE_H * s;
+      tctx.drawImage(l.canvas, (44-tw)/2, (44-th)/2, tw, th);
+      thumb.addEventListener('click', () => selectLayer(l.id));
+
+      const info = document.createElement('div');
+      info.className = 'layer-info';
+      const nameEl = document.createElement('div');
+      nameEl.className = 'name';
+      nameEl.textContent = l.name;
+      nameEl.addEventListener('click', () => selectLayer(l.id));
+      const opInp = document.createElement('input');
+      opInp.type = 'range'; opInp.min = 0; opInp.max = 100; opInp.value = Math.round(l.opacity*100);
+      opInp.addEventListener('input', e => { l.opacity = (+e.target.value)/100; render(); });
+      info.appendChild(nameEl);
+      info.appendChild(opInp);
+
+      const btns = document.createElement('div');
+      btns.className = 'layer-btns';
+
+      const visBtn = document.createElement('button');
+      visBtn.textContent = l.visible ? '👁' : '🚫';
+      visBtn.addEventListener('click', () => { l.visible = !l.visible; render(); updateLayersList(); });
+
+      const upBtn = document.createElement('button');
+      upBtn.textContent = '↑';
+      upBtn.disabled = i === layers.length - 1;
+      upBtn.addEventListener('click', () => { if(i < layers.length-1){ [layers[i],layers[i+1]] = [layers[i+1],layers[i]]; refreshAll(); } });
+
+      const downBtn = document.createElement('button');
+      downBtn.textContent = '↓';
+      downBtn.disabled = i === 0;
+      downBtn.addEventListener('click', () => { if(i > 0){ [layers[i],layers[i-1]] = [layers[i-1],layers[i]]; refreshAll(); } });
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'danger';
+      delBtn.textContent = '✕';
+      delBtn.addEventListener('click', () => {
+        layers.splice(i,1);
+        if(selectedId === l.id) selectedId = layers.length ? layers[layers.length-1].id : null;
+        refreshAll();
+      });
+
+      btns.appendChild(visBtn);
+      btns.appendChild(upBtn);
+      btns.appendChild(downBtn);
+      btns.appendChild(delBtn);
+
+      row.appendChild(thumb);
+      row.appendChild(info);
+      row.appendChild(btns);
+      layersList.appendChild(row);
+    }
+  }
+
+  refreshAll();
+})();
+</script>
 </body>
 </html>
